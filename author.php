@@ -80,7 +80,7 @@ include_once ("include/dbconnect.php");
             </li>
             <? } // StoryRS loop
                                                 
-              //              } //AuthorStoryRS loop
+                            } //AuthorStoryRS loop
                            $count_author_access= Update_Author_Count($AuthorID);
                         
             ?>
