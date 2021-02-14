@@ -1,4 +1,4 @@
-<?
+<?php
 /**
  * Process.php
  * 
@@ -8,7 +8,7 @@
  * way. Also handles the logout procedure.
  *
  * Written by: Jpmaster77 a.k.a. The Grandmaster of C++ (GMC)
- * Last Updated: August 19, 2004
+ * Last Updated: June 15, 2011 by Ivan Novak
  */
 include("include/session.php");
 
@@ -32,6 +32,12 @@ class Process
       /* User submitted edit account form */
       else if(isset($_POST['subedit'])){
          $this->procEditAccount();
+      }
+      else if(isset($_POST['subConfirm'])){
+      	$this->procSendConfirm();
+      }
+      else if(isset($_POST['login_with_hash'])){
+      	$this->procHashLogin($_POST['hash']);
       }
       /**
        * The only other reason user should be directed here
@@ -58,6 +64,7 @@ class Process
    function procLogin(){
       global $session, $form;
       /* Login attempt */
+      $_POST = $session->cleanInput($_POST);
       $retval = $session->login($_POST['user'], $_POST['pass'], isset($_POST['remember']));
       
       /* Login successful */
@@ -91,12 +98,13 @@ class Process
     */
    function procRegister(){
       global $session, $form;
+      $_POST = $session->cleanInput($_POST);
       /* Convert username to all lowercase (by option) */
       if(ALL_LOWERCASE){
          $_POST['user'] = strtolower($_POST['user']);
       }
       /* Registration attempt */
-      $retval = $session->register($_POST['user'], $_POST['pass'], $_POST['email']);
+      $retval = $session->register($_POST['user'], $_POST['pass'], $_POST['email'], $_POST['name']);
       
       /* Registration Successful */
       if($retval == 0){
@@ -125,6 +133,7 @@ class Process
     */
    function procForgotPass(){
       global $database, $session, $mailer, $form;
+      $_POST = $session->cleanInput($_POST);
       /* Username error checking */
       $subuser = $_POST['user'];
       $field = "user";  //Use field name for username
@@ -135,7 +144,7 @@ class Process
          /* Make sure username is in database */
          $subuser = stripslashes($subuser);
          if(strlen($subuser) < 5 || strlen($subuser) > 30 ||
-            !eregi("^([0-9a-z])+$", $subuser) ||
+            !ctype_alnum($subuser) ||
             (!$database->usernameTaken($subuser))){
             $form->setError($field, "* Username does not exist<br>");
          }
@@ -177,8 +186,9 @@ class Process
     */
    function procEditAccount(){
       global $session, $form;
+      $_POST = $session->cleanInput($_POST);
       /* Account edit attempt */
-      $retval = $session->editAccount($_POST['curpass'], $_POST['newpass'], $_POST['email']);
+      $retval = $session->editAccount($_POST['curpass'], $_POST['newpass'], $_POST['email'], $_POST['name']);
 
       /* Account edit successful */
       if($retval){
@@ -191,6 +201,90 @@ class Process
          $_SESSION['error_array'] = $form->getErrorArray();
          header("Location: ".$session->referrer);
       }
+   }
+   
+   /**
+   	* procSendConfirm - only needs to be used if the administrator
+   	* changes the EMAIL_WELCOME from false to true and wants
+   	* the users to confirm themselves. (why not?!)
+   	*/
+   function procSendConfirm(){
+       global $session, $form, $database, $mailer;
+       $_POST = $session->cleanInput($_POST);
+       
+       $user	=	$_POST['user'];
+       $pass	=	$_POST['pass'];
+       
+      /* Checks that username is in database and password is correct */
+      $user = stripslashes($user);
+      $result = $database->confirmUserPass($user, md5($pass));
+
+      /* Check error codes */
+      if($result == 1){
+         $field = "user";
+         $form->setError($field, "* Username not found");
+      }
+      elseif($result == 2){
+         $field = "pass";
+         $form->setError($field, "* Invalid password");
+      }
+      
+      /* Check to see if the user is already valid */
+      $q = "SELECT valid FROM ".TBL_USERS." WHERE username='$user'";
+      $valid = $database->query($q);
+      $valid = mysql_fetch_array($valid);
+      $valid = $valid['valid'];
+      
+      if($valid == 1){
+         $field = 'user';
+         $form->setError($field, "* Username already confirmed.");
+      }
+      
+      /* Return if form errors exist */
+      if($form->num_errors > 0){
+         $_SESSION['value_array'] = $_POST;
+         $_SESSION['error_array'] = $form->getErrorArray();
+         header("Location: ".$session->referrer);
+      }
+      else{
+	      $q = "SELECT username, userid, email FROM ".TBL_USERS." WHERE username='$user'";
+	      $info = $database->query($q) or die(mysql_error());
+	      $info = mysql_fetch_array($info);
+	      
+		      $username = $info['username'];
+		      $userid = $info['userid'];
+		      $email = $info['email'];
+	      
+	      if($mailer->sendConfirmation($username,$userid,$email)){
+	      	  echo "Your confirmation email has been sent! Back to <a href='main.php'>Main</a>";
+	      }
+	  }
+   }
+   
+   function procHashLogin($hash){
+   		global $session, $database;
+   		if(substr($hash,0,1) === "#"){
+   			$hash = substr($hash,1);
+   		}
+   		
+   		$user_info = $database->getUserInfoFromHash($hash);
+		
+   		if($user_info['hash_generated'] < (time() - (60*60*24*3))){
+   			// if the hash was generated more than 3 days ago, the hash is invalid.
+   			// let's invalidate and refuse the hash.
+   			$database->updateUserField($user_info['username'], 'hash', $session->generateRandID());
+	        $database->updateUserField($user_info['username'], 'hash_generated', time());
+	        return false;
+   		}
+   		
+   		if($user_info['username'] && $user_info['userid']){  
+   			$_SESSION['username'] = $user_info['username'];
+	   		$_SESSION['userid'] = $user_info['userid'];
+	   		$session->checkLogin();
+	   		die("Logging In...");
+	   	} else {
+	   		die();
+	   	}
    }
 };
 
