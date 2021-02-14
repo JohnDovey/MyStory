@@ -23,11 +23,17 @@ include_once ("include/dbconnect.php");
             Num Stories
         </th>
     </tr>
-    <?    $query="Select * from Author order by Author_nondeplume;";
-	$result = mysql_query($query) or die('<h3>Query failed: '.mysql_error().'</h3>');
-    $rowcount = mysql_num_rows($result);
+    <?
+    
+	//$result = mysql_query($query) or die('<h3>Query failed: '.mysql_error().'</h3>');
+    $sql = "SELECT COUNT(*) from Author;";
+	$rowcount = $dbase->querySingle($sql);
     $TotRecords = $rowcount;
-	while($authorRS = mysql_fetch_array($result)){
+    $query="Select * from Author order by Author_nondeplume;";
+    $ret = $db->query($sql);
+   
+    while($authorRS = $ret->fetchArray(SQLITE3_ASSOC) ){
+	
     $NumStories=GetNumStories($authorRS['idAuthor']);
     //if ($NumStories > 0) { ?>
 <tr>
@@ -38,7 +44,8 @@ include_once ("include/dbconnect.php");
         <?=$NumStories?>&nbsp;
     </td>
     </tr>
-    <?    //} //end if
+    <?
+    //} //end if
     } //loop
 ?>
 </table>
