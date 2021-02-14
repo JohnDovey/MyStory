@@ -59,9 +59,9 @@ include_once ("include/dbconnect.php");
         </table>
         <ul>
             <?php
-            //$query = "Select * from Author_Story where idAuthor=".$AuthorID;
-            //$result = mysql_query($query) or die('<h3>Query failed: '.mysql_error().'</h3>');
-            //while ($AuthorStoryRS = mysql_fetch_array($result)) {
+            $query = "Select * from Author_Story where idAuthor=".$AuthorID;
+            $result = mysql_query($query) or die('<h3>Query failed: '.mysql_error().'</h3>');
+            while ($AuthorStoryRS = mysql_fetch_array($result)) {
                 $query = "Select * from Story where idAuthor=".$AuthorID;
                 $result = mysql_query($query) or die('<h3>Query failed: '.mysql_error().'</h3>');
                 while ($StoryRS = mysql_fetch_array($result)) {
